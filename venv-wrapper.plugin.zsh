@@ -86,10 +86,8 @@ function purgenv {
     fi
 }
 
-autoload bashcompinit
-bashcompinit
-_complete_venv() {
-    COMPREPLY+=$(ls -1 $VENV_HOME)
+_venv_completion () {
+    _values echo $(ls -1 $VENV_HOME)
 }
-complete -F _complete_venv venv
-complete -F _complete_venv rmvenv
+
+compdef _venv_completion venv rmvenv
