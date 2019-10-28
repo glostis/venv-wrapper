@@ -20,8 +20,16 @@ venv() {
         # If previous command returned an error code
         if [ ! $? -eq 0 ]; then
             (>&2 echo "Virtual environment \`$1\` does not exist.")
-            (>&2 echo "To make it, type \`mkvenv $1\`")
-            return 1
+            while true; do
+                read -q "yn?Do you want to create it? [y/n]"
+                echo
+                if [[ "$yn" = "y" ]]; then
+                    mkvenv "$1"
+                    break
+                elif [[ "$yn" = "n" ]]; then
+                    return 1
+                fi
+            done
         fi
     else
         (>&2 echo "Type \`venv name_of_env\` to activate a virtual environment.\n")
@@ -33,14 +41,20 @@ venv() {
 mkvenv() {
     # Check that exactly one and only one argument was passed to the function
     if [ $# -eq 1 ]; then
-        venv $1 2> /dev/null
-        if [ ! $? -eq 0 ]; then
+        VENV_NAME=$(python -c "import sys; import os; assert hasattr(sys, 'base_prefix'); print(os.path.basename(sys.prefix))" 2> /dev/null)
+        if [ $? -eq 0 ]; then
+            (>&2 echo "You must first deactivate your current virtual environment before creating a new one,")
+            (>&2 echo "by typing: \`deactivate\`")
+            return 1
+        fi
+        if [ -d "${VENV_HOME}/$1" ]; then
+            (>&2 echo "Virtual environment $1 already exists.")
+            (>&2 echo "To remove it, run \`deactivate; rmvenv $1\`")
+            return 1
+        else
             python3 -m venv $VENV_HOME/$1
             venv $1
             echo "Created and activated venv $1"
-        else
-            (>&2 echo "Virtual environment $1 already exists.")
-            (>&2 echo "To remove it, run \`deactivate; rmvenv $1\`")
         fi
     else
         (>&2 echo "Type \`mkvenv name_of_env\` to make a new virtual environment.")
@@ -50,25 +64,31 @@ mkvenv() {
 
 rmvenv() {
     # Check that exactly one and only one argument was passed to the function
-    if [ $# -eq 1 ]; then
-        VENV_NAME=$(python -c "import sys; import os; assert hasattr(sys, 'base_prefix'); print(os.path.basename(sys.prefix))" 2> /dev/null)
-        if [ $? -eq 0 ]; then
-            if [ "$VENV_NAME" = "$1" ]; then
-                (>&2 echo "You must first deactivate your virtual environment before removing it,")
-                (>&2 echo "by typing: \`deactivate; rmvenv $1\`")
-                return 1
-            fi
-        fi
-        if [ -d "$VENV_HOME/$1" ]; then
-            rm -r $VENV_HOME/$1
-            echo "Removed venv $1"
-        else
-            (>&2 echo "venv $1 does not exist.\n")
-            lsvenv
-            return 1
-        fi
+    if [ $# -gt 0 ]; then
+        for arg in "$@"; do
+            _rmvenv "$arg"
+        done
     else
         (>&2 echo "Type \`rmvenv name_of_env\` to remove an existing virtual environment.\n")
+        lsvenv
+        return 1
+    fi
+}
+
+_rmvenv() {
+    VENV_NAME=$(python -c "import sys; import os; assert hasattr(sys, 'base_prefix'); print(os.path.basename(sys.prefix))" 2> /dev/null)
+    if [ $? -eq 0 ]; then
+        if [ "$VENV_NAME" = "$1" ]; then
+            (>&2 echo "You must first deactivate your virtual environment before removing it,")
+            (>&2 echo "by typing: \`deactivate; rmvenv $1\`")
+            return 1
+        fi
+    fi
+    if [ -d "$VENV_HOME/$1" ]; then
+        rm -r $VENV_HOME/$1
+        echo "Removed venv $1"
+    else
+        (>&2 echo "venv $1 does not exist.\n")
         lsvenv
         return 1
     fi
