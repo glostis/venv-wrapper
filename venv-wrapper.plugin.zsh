@@ -52,7 +52,7 @@ mkvenv() {
             (>&2 echo "To remove it, run \`deactivate; rmvenv $1\`")
             return 1
         else
-            python3 -m venv $VENV_HOME/$1
+            ${VENV_WRAPPER_PYTHON:-python3} -m venv $VENV_HOME/$1
             venv $1
             echo "Created and activated venv $1"
         fi
