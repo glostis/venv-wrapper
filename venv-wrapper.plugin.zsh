@@ -41,7 +41,7 @@ venv() {
 mkvenv() {
     # Check that exactly one and only one argument was passed to the function
     if [ $# -eq 1 ]; then
-        VENV_NAME=$(python -c "import sys; import os; assert hasattr(sys, 'base_prefix'); print(os.path.basename(sys.prefix))" 2> /dev/null)
+        VENV_NAME=$(_venv_name)
         if [ $? -eq 0 ]; then
             (>&2 echo "You must first deactivate your current virtual environment before creating a new one,")
             (>&2 echo "by typing: \`deactivate\`")
@@ -76,7 +76,7 @@ rmvenv() {
 }
 
 _rmvenv() {
-    VENV_NAME=$(python -c "import sys; import os; assert hasattr(sys, 'base_prefix'); print(os.path.basename(sys.prefix))" 2> /dev/null)
+    VENV_NAME=$(_venv_name)
     if [ $? -eq 0 ]; then
         if [ "$VENV_NAME" = "$1" ]; then
             (>&2 echo "You must first deactivate your virtual environment before removing it,")
@@ -94,15 +94,33 @@ _rmvenv() {
     fi
 }
 
-function purgenv {
-    if $(python -c "import sys; assert hasattr(sys, 'base_prefix')"); then
+_is_in_venv() {
+    # Inside a virtual environment, sys.prefix points to the virtual environment,
+    # whereas base_prefix points to a parent directory of the "real" python
+    python -c "import sys; import os; assert hasattr(sys, 'base_prefix'); assert sys.base_prefix != sys.prefix" 2> /dev/null
+    return $?
+}
+
+_venv_name() {
+    # Print the venv name if in a venv, else return an error code
+    _is_in_venv
+    if [ $? -eq 0 ]; then
+        python -c "import sys; import os; print(os.path.basename(sys.prefix))"
+    else
+        return $?
+    fi
+}
+
+purgenv() {
+    ORI_VENV_NAME=$(_venv_name)
+    if [ $? -eq 0 ]; then
         echo "You are in the matrix"
-        env_name=$(which python | rev | cut -d/ -f3 | rev)
         deactivate
-        rmvenv $env_name
-        mkvenv $env_name
+        rmvenv $ORI_VENV_NAME
+        mkvenv $ORI_VENV_NAME
     else
         echo "You are in the real world"
+        return 1
     fi
 }
 
